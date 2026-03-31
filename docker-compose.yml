@@ -7,10 +7,10 @@ services:
       args:
         REGISTRY_PREFIX_DOCKER_HUB: ${REGISTRY_PREFIX_DOCKER_HUB:-}
     restart: unless-stopped
-    networks:
-      - lms-network
-    ports:
-      - ${BACKEND_HOST_ADDRESS:?'BACKEND_HOST_ADDRESS is required'}:${BACKEND_HOST_PORT:?'BACKEND_HOST_PORT is required'}:${BACKEND_CONTAINER_PORT}
+    network_mode: host
+    # Note: Using host network to allow external API access (autochecker).
+    # When using host network, ports are bound directly on the host.
+    # environment:
     environment:
       - NAME=${BACKEND_NAME:?'BACKEND_NAME is required'}
       - DEBUG=${BACKEND_DEBUG:?'BACKEND_DEBUG is required'}
@@ -27,8 +27,8 @@ services:
       - AUTOCHECKER_API_URL=${AUTOCHECKER_API_URL:?'AUTOCHECKER_API_URL is required'}
       - AUTOCHECKER_API_LOGIN=${AUTOCHECKER_API_LOGIN:?'AUTOCHECKER_API_LOGIN is required'}
       - AUTOCHECKER_API_PASSWORD=${AUTOCHECKER_API_PASSWORD:?'AUTOCHECKER_API_PASSWORD is required'}
-      - DB_HOST=${CONST_POSTGRESQL_SERVICE_NAME:?'CONST_POSTGRESQL_SERVICE_NAME is required'}
-      - DB_PORT=${CONST_POSTGRESQL_DEFAULT_PORT:?'CONST_POSTGRESQL_DEFAULT_PORT is required'}
+      - DB_HOST=127.0.0.1
+      - DB_PORT=${POSTGRES_HOST_PORT:?'POSTGRES_HOST_PORT is required'}
       - DB_NAME=${POSTGRES_DB:?'POSTGRES_DB is required'}
       - DB_USER=${POSTGRES_USER:?'POSTGRES_USER is required'}
       - DB_PASSWORD=${POSTGRES_PASSWORD:?'POSTGRES_PASSWORD is required'}
@@ -36,7 +36,7 @@ services:
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
       - OTEL_LOGS_EXPORTER=otlp
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:${CONST_OTEL_COLLECTOR_GRPC_PORT:?'CONST_OTEL_COLLECTOR_GRPC_PORT is required'}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:${CONST_OTEL_COLLECTOR_GRPC_PORT:?'CONST_OTEL_COLLECTOR_GRPC_PORT is required'}
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_PYTHON_LOG_CORRELATION=true
     depends_on:
@@ -133,6 +133,8 @@ services:
     image: ${REGISTRY_PREFIX_DOCKER_HUB:-}caddy:2.11-alpine
     networks:
       - lms-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - backend
       - client-web-react
@@ -166,10 +168,9 @@ services:
       args:
         REGISTRY_PREFIX_DOCKER_HUB: ${REGISTRY_PREFIX_DOCKER_HUB:-}
     restart: unless-stopped
-    networks:
-      - lms-network
-    ports:
-      - ${QWEN_CODE_API_HOST_ADDRESS:?'QWEN_CODE_API_HOST_ADDRESS is required'}:${QWEN_CODE_API_HOST_PORT:?'QWEN_CODE_API_HOST_PORT is required'}:${QWEN_CODE_API_CONTAINER_PORT:-8080}
+    network_mode: host
+    # Note: Using host network to allow external API access (Qwen OAuth).
+    # When using host network, ports are bound directly on the host.
     volumes:
       - ~/.qwen:/mnt/qwen-creds:ro
     environment:

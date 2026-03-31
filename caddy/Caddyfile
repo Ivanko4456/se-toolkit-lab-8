@@ -16,19 +16,19 @@
     respond @unknown-utils "Not Found" 404
 
     handle /items* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://host.docker.internal:{$BACKEND_CONTAINER_PORT}
     }
     handle /learners* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://host.docker.internal:{$BACKEND_CONTAINER_PORT}
     }
     handle /interactions* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://host.docker.internal:{$BACKEND_CONTAINER_PORT}
     }
     handle /pipeline* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://host.docker.internal:{$BACKEND_CONTAINER_PORT}
     }
     handle /analytics* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://host.docker.internal:{$BACKEND_CONTAINER_PORT}
     }
     # Task 2A — uncomment once the nanobot service is running behind Caddy.
     # handle /ws/chat {
@@ -44,10 +44,10 @@
         reverse_proxy http://victoriatraces:{$CONST_VICTORIATRACES_CONTAINER_PORT}
     }
     handle /docs* {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://host.docker.internal:{$BACKEND_CONTAINER_PORT}
     }
     handle /openapi.json {
-        reverse_proxy http://backend:{$BACKEND_CONTAINER_PORT}
+        reverse_proxy http://host.docker.internal:{$BACKEND_CONTAINER_PORT}
     }
     # Task 2B — uncomment once the Flutter build output is mounted at /srv/flutter.
     # handle_path /flutter* {

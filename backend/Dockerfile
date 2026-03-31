@@ -55,6 +55,9 @@ RUN groupadd --system --gid 999 nonroot \
 # Copy the application from the builder
 COPY --from=builder --chown=nonroot:nonroot /app /app
 
+# Install CA certificates for HTTPS
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/backend"

@@ -1,0 +1,26 @@
+{
+  "providers": {
+    "custom": {
+      "apiKey": "sk-e4493f7004bd454b97f1bc42e6ea24a5",
+      "apiBase": "http://localhost:8080/v1"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "coder-model",
+      "provider": "custom"
+    }
+  },
+  "tools": {
+    "mcpServers": {
+      "lms": {
+        "command": "uv",
+        "args": ["--directory", "/root/se-toolkit-lab-8/nanobot", "run", "python", "-m", "mcp_lms"],
+        "env": {
+          "NANOBOT_LMS_BACKEND_URL": "http://127.0.0.1:42002",
+          "NANOBOT_LMS_API_KEY": "qwe"
+        }
+      }
+    }
+  }
+}
