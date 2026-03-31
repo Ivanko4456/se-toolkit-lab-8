@@ -2,7 +2,7 @@
   "providers": {
     "custom": {
       "apiKey": "sk-e4493f7004bd454b97f1bc42e6ea24a5",
-      "apiBase": "http://localhost:8080/v1"
+      "apiBase": "http://localhost:42005/v1"
     }
   },
   "agents": {
