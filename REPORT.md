@@ -116,11 +116,44 @@ The skill prompt guides the agent to:
 
 ## Task 2A — Deployed agent
 
-<!-- Paste a short nanobot startup log excerpt showing the gateway started inside Docker -->
+**Nanobot gateway startup log:**
+
+```
+nanobot-1  | 🐈 Starting nanobot gateway version 0.1.4.post6 on port 18790...
+nanobot-1  | 2026-03-31 23:43:50.311 | INFO | nanobot.channels.manager:_init_channels:58 - WebChat channel enabled
+nanobot-1  | ✓ Channels enabled: webchat
+nanobot-1  | ✓ Heartbeat: every 1800s
+nanobot-1  | 2026-03-31 23:43:50.867 | INFO | nanobot.channels.manager:start_all:91 - Starting webchat channel...
+nanobot-1  | 2026-03-31 23:43:50.868 | INFO | nanobot.channels.manager:_dispatch_outbound:119 - Outbound dispatcher started
+nanobot-1  | 2026-03-31 23:43:53.648 | INFO | nanobot.agent.tools.mcp:connect_mcp_servers:246 - MCP server 'lms': connected, 9 tools registered
+nanobot-1  | 2026-03-31 23:43:53.648 | INFO | nanobot.agent.loop:run:280 - Agent loop started
+```
+
+**Files created/modified:**
+- `nanobot/entrypoint.py` - Runtime config resolver and gateway launcher
+- `nanobot/Dockerfile` - Multi-stage build with uv
+- `nanobot/config.json` - Gateway and webchat channel configuration
+- `docker-compose.yml` - Uncommented nanobot service with host.docker.internal for LLM access
+- `caddy/Caddyfile` - Uncommented /ws/chat route
 
 ## Task 2B — Web client
 
-<!-- Screenshot of a conversation with the agent in the Flutter web app -->
+**WebSocket endpoint test:**
+- Endpoint: `ws://localhost:42002/ws/chat?access_key=qwe`
+- Flutter client: `http://10.93.26.38:42002/flutter`
+
+**Files created/modified:**
+- `.gitmodules` - Added nanobot-websocket-channel submodule
+- `nanobot-websocket-channel/` - Submodule with webchat channel and Flutter client
+- `nanobot/pyproject.toml` - Added nanobot-webchat dependency
+- `nanobot/Dockerfile` - Added nanobot-channel-protocol and nanobot-webchat installation
+- `docker-compose.yml` - Uncommented client-web-flutter service and caddy volume
+- `caddy/Caddyfile` - Uncommented /flutter route
+
+**Verification:**
+- `docker compose ps` shows nanobot-1 and client-web-flutter-1 running
+- Flutter client accessible at http://10.93.26.38:42002/flutter
+- WebChat channel enabled in nanobot logs
 
 ## Task 3A — Structured logging
 
