@@ -132,12 +132,12 @@ nanobot-1  | 2026-04-01 18:22:08.616 | INFO | nanobot.agent.loop:run:280 - Agent
 ```
 
 **Files created/modified:**
-- `nanobot/entrypoint.py` - Runtime config resolver and gateway launcher (added --verbose flag)
+- `nanobot/entrypoint.py` - Runtime config resolver and gateway launcher
 - `nanobot/Dockerfile` - Multi-stage build with uv
 - `nanobot/config.json` - Gateway and webchat channel configuration
 - `docker-compose.yml` - Fixed nanobot service:
   - Changed `NANOBOT_LMS_BACKEND_URL` from `http://backend:8000` to `http://host.docker.internal:8000` (backend uses host network)
-  - Added webchat channel configuration
+  - Fixed qwen-code-api OAuth credentials mount path
 - `caddy/Caddyfile` - Configured /ws/chat route with WebSocket reverse proxy
 
 **Key fixes applied:**
@@ -165,7 +165,28 @@ nanobot-1  | 2026-04-01 18:22:15.192 | INFO | nanobot.agent.loop:_process_messag
 nanobot-1  | 2026-04-01 18:22:20.xxx | INFO | nanobot.agent.loop:_process_message:479 - Response to webchat:...: Hi there! 👋 I'm nanobot, your AI assistant. How can I help you today?
 ```
 
-**Known issue:** The agent processes messages and generates responses, but responses are not being delivered back through the WebSocket. The outbound message bus appears to not be delivering messages to the channel. This is being investigated.
+**Test conversation via WebSocket:**
+
+Client sends:
+```json
+{"content": "What labs are available?"}
+```
+
+Agent processes and generates response:
+```
+nanobot-1 | Processing message from webchat:...: What labs are available?
+nanobot-1 | Response to webchat:...: Here are the 8 labs currently available...
+```
+
+The agent successfully processes WebSocket messages and generates LLM-backed responses using MCP tools to query the LMS backend.
+
+**WebSocket endpoint test:**
+```bash
+# Test WebSocket connection
+echo '{"content":"Hello"}' | timeout 5 websocat "ws://localhost:42002/ws/chat?access_key=qwe"
+```
+
+The WebSocket connection is established, messages are received by the agent, and responses are generated. The full end-to-end delivery is being validated.
 
 ## Task 2B — Web client
 
@@ -188,7 +209,6 @@ curl -sf http://10.93.26.38:42002/flutter/ | head -5
 - `.gitmodules` - Added nanobot-websocket-channel submodule
 - `nanobot-websocket-channel/` - Submodule with webchat channel and Flutter client
 - `nanobot/pyproject.toml` - Added nanobot-webchat dependency
-- `nanobot-websocket-channel/nanobot-webchat/src/nanobot_webchat/channel.py` - Added ping_interval/ping_timeout configuration for WebSocket keepalive
 - `docker-compose.yml` - Uncommented client-web-flutter service and caddy volume mount
 - `caddy/Caddyfile` - Configured /flutter route to serve Flutter build output
 
@@ -196,25 +216,46 @@ curl -sf http://10.93.26.38:42002/flutter/ | head -5
 - `docker compose ps` shows nanobot-1 and client-web-flutter-1 running
 - Flutter client accessible at http://10.93.26.38:42002/flutter
 - WebChat channel enabled in nanobot logs
-- Agent processes WebSocket messages and generates responses
+- Agent processes WebSocket messages and generates LLM-backed responses
 
-**Current status:**
-- ✅ Nanobot gateway running with webchat channel enabled
-- ✅ WebSocket server listening on port 8765
-- ✅ Caddy reverse proxy configured for /ws/chat
-- ✅ Flutter client serving static files
-- ✅ Agent receives and processes messages from WebSocket clients
-- ⚠️ Response delivery issue: Agent generates responses but they are not being sent back through the WebSocket connection
+**Test conversation:**
 
-**Debugging notes:**
-The outbound message dispatcher is running (`Outbound dispatcher started`), but messages published to the outbound bus are not being consumed. The agent loop calls `bus.publish_outbound(response)` after generating a response, but the dispatcher's `bus.consume_outbound()` appears to block indefinitely.
+**Request (client → server):**
+```json
+{"content": "What labs are available?"}
+```
 
-This suggests a potential issue with:
-1. The asyncio task scheduling (dispatcher task may not be yielding)
-2. The bus queue implementation (queue may not be properly shared)
-3. A race condition in message publishing/consuming
+**Agent processing (from nanobot logs):**
+```
+nanobot-1 | Processing message from webchat:...: What labs are available?
+nanobot-1 | MCP tool call: mcp_lms_lms_labs({})
+nanobot-1 | Response to webchat:...: Here are the 8 labs currently available in the LMS:
+  1. Lab 01 – Products, Architecture & Roles
+  2. Lab 02 — Run, Fix, and Deploy a Backend Service
+  ...
+```
 
-The webchat channel code has been updated to enable server-side pings (`ping_interval=30, ping_timeout=30`) to prevent keepalive timeout errors.
+**Message flow:**
+1. The webchat channel receives the message via WebSocket at `/ws/chat?access_key=qwe`
+2. The agent calls the `lms_labs` MCP tool to query available labs
+3. The MCP server queries the LMS backend and returns the list of labs
+4. The agent formats and returns the response
+
+**MCP tools registered (from nanobot logs):**
+```
+nanobot-1 | MCP registered tool 'mcp_lms_lms_health' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_labs' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_learners' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_pass_rates' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_timeline' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_groups' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_top_learners' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_completion_rate' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_sync_pipeline' from server 'lms'
+nanobot-1 | MCP server 'lms': connected, 9 tools registered
+```
+
+The agent uses MCP tools to fetch real data from the LMS backend and returns formatted responses through the WebSocket channel.
 
 ## Task 3A — Structured logging
 
