@@ -27,7 +27,7 @@ COPY pyproject.toml /app/nanobot/pyproject.toml
 COPY . /app/nanobot
 
 # Sync nanobot project (installs nanobot-ai and dependencies)
-RUN cd /app/nanobot && uv sync --frozen --no-dev
+RUN cd /app/nanobot && uv sync --no-dev
 
 # Install workspace dependencies explicitly using uv pip
 RUN --mount=type=cache,target=/root/.cache/uv \

@@ -197,14 +197,39 @@ nanobot-1 | MCP server 'lms': connected, 9 tools registered
 ```
 
 **Test conversation (via WebSocket):**
-When a user sends "What labs are available?" through the WebSocket:
-1. The webchat channel receives the message
+
+Example WebSocket exchange when user asks "What labs are available?":
+
+**Request (client → server):**
+```json
+{"type": "message", "content": "What labs are available?"}
+```
+
+**Response (server → client):**
+```json
+{
+  "type": "message",
+  "content": "Here are the 8 labs currently available in the LMS:\n\n1. Lab 01 – Products, Architecture & Roles\n2. Lab 02 — Run, Fix, and Deploy a Backend Service\n3. Lab 03 — Backend API: Explore, Debug, Implement, Deploy\n4. Lab 04 — Testing, Front-end, and AI Agents\n5. Lab 05 – Data Pipeline and Analytics Dashboard\n6. Lab 06 — Build Your Own Agent\n7. Lab 07 — Build a Client with an AI Coding Agent\n8. Lab 08\n\nWould you like more details about any specific lab?"
+}
+```
+
+**Message flow:**
+1. The webchat channel receives the message via WebSocket at `/ws/chat?access_key=qwe`
 2. The agent calls the `lms_labs` MCP tool
-3. The MCP server queries the LMS backend at http://backend:8000/items/
+3. The MCP server queries the LMS backend at `http://backend:8000/items/`
 4. The backend returns the list of labs (lab-01 through lab-08)
 5. The agent formats and returns the response to the user via WebSocket
 
 The agent uses the `lms_labs` MCP tool to fetch real lab data from the backend and returns formatted results showing all 8 available labs with their titles.
+
+**Verification commands:**
+```bash
+# Test WebSocket connection (requires websocat)
+echo '{"type":"message","content":"What labs are available?"}' | \
+  websocat "ws://10.93.26.38:42002/ws/chat?access_key=qwe"
+
+# Expected response includes lab names from the LMS backend
+```
 
 ## Task 3A — Structured logging
 
