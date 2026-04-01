@@ -26,18 +26,18 @@ COPY pyproject.toml /app/nanobot/pyproject.toml
 # Copy the rest of nanobot source (from build context)
 COPY . /app/nanobot
 
-# Create venv and install all dependencies
-RUN cd /app/nanobot && uv venv
-# Install nanobot-ai first (brings in pydantic, aiohttp, etc.)
+# Sync nanobot project (installs nanobot-ai and dependencies)
+RUN cd /app/nanobot && uv sync --frozen --no-dev
+
+# Install workspace dependencies explicitly using uv pip
 RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /app/nanobot && uv pip install "nanobot-ai>=0.1.4.post6"
-# Install workspace dependencies
+    uv pip install --python /app/.venv/bin/python -e /app/mcp
+
 RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /app/nanobot && uv pip install /app/mcp
+    uv pip install --python /app/.venv/bin/python -e /app/nanobot-websocket-channel/nanobot-channel-protocol
+
 RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /app/nanobot && uv pip install /app/nanobot-websocket-channel/nanobot-channel-protocol
-RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /app/nanobot && uv pip install /app/nanobot-websocket-channel/nanobot-webchat
+    uv pip install --python /app/.venv/bin/python -e /app/nanobot-websocket-channel/nanobot-webchat
 
 # ---
 # Stage 2: use a final image without uv
@@ -61,7 +61,7 @@ COPY --from=builder --chown=nonroot:nonroot /app /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Place executables in the environment at the front of the path
-ENV PATH="/app/nanobot/.venv/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Use the non-root user
 USER nonroot

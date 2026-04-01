@@ -13,5 +13,5 @@ dependencies = [
 
 [tool.uv.sources]
 lms-mcp = { workspace = true }
-nanobot-webchat = { path = "../nanobot-websocket-channel/nanobot-webchat" }
-nanobot-channel-protocol = { path = "../nanobot-websocket-channel/nanobot-channel-protocol" }
+nanobot-webchat = { workspace = true }
+nanobot-channel-protocol = { workspace = true }
