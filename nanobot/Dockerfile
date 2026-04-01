@@ -10,9 +10,6 @@ ARG REGISTRY_PREFIX_DOCKER_HUB
 FROM ${REGISTRY_PREFIX_DOCKER_HUB}astral/uv:python3.14-bookworm-slim AS builder
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
-# Omit development dependencies
-ENV UV_NO_DEV=1
-
 # Disable Python downloads
 ENV UV_PYTHON_DOWNLOADS=0
 
@@ -23,19 +20,24 @@ COPY --from=workspace pyproject.toml uv.lock /app/
 COPY --from=workspace mcp /app/mcp
 COPY --from=workspace nanobot-websocket-channel /app/nanobot-websocket-channel
 
-# Copy nanobot pyproject.toml for sync
+# Copy nanobot pyproject.toml
 COPY pyproject.toml /app/nanobot/pyproject.toml
-
-# Sync nanobot with workspace dependencies
-RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /app/nanobot && uv sync --frozen --no-dev
 
 # Copy the rest of nanobot source (from build context)
 COPY . /app/nanobot
 
-# Final sync with all source files
+# Create venv and install all dependencies
+RUN cd /app/nanobot && uv venv
+# Install nanobot-ai first (brings in pydantic, aiohttp, etc.)
 RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /app/nanobot && uv sync --frozen --no-dev
+    cd /app/nanobot && uv pip install "nanobot-ai>=0.1.4.post6"
+# Install workspace dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    cd /app/nanobot && uv pip install /app/mcp
+RUN --mount=type=cache,target=/root/.cache/uv \
+    cd /app/nanobot && uv pip install /app/nanobot-websocket-channel/nanobot-channel-protocol
+RUN --mount=type=cache,target=/root/.cache/uv \
+    cd /app/nanobot && uv pip install /app/nanobot-websocket-channel/nanobot-webchat
 
 # ---
 # Stage 2: use a final image without uv
@@ -59,8 +61,7 @@ COPY --from=builder --chown=nonroot:nonroot /app /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Place executables in the environment at the front of the path
-ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/nanobot"
+ENV PATH="/app/nanobot/.venv/bin:$PATH"
 
 # Use the non-root user
 USER nonroot
