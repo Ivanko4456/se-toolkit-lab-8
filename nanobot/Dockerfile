@@ -19,25 +19,23 @@ ENV UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
 COPY --from=workspace pyproject.toml uv.lock /app/
 
-# Copy nanobot, mcp, and nanobot-websocket-channel projects from workspace
-COPY pyproject.toml /app/nanobot/pyproject.toml
+# Copy mcp and nanobot-websocket-channel from workspace
 COPY --from=workspace mcp /app/mcp
 COPY --from=workspace nanobot-websocket-channel /app/nanobot-websocket-channel
 
-# Sync nanobot with workspace dependencies (without nanobot-webchat first)
+# Copy nanobot pyproject.toml for sync
+COPY pyproject.toml /app/nanobot/pyproject.toml
+
+# Sync nanobot with workspace dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
     cd /app/nanobot && uv sync --frozen --no-dev
 
 # Copy the rest of nanobot source (from build context)
 COPY . /app/nanobot
 
-# Install nanobot-channel-protocol first (dependency of nanobot-webchat)
+# Final sync with all source files
 RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /app/nanobot && uv pip install --no-deps -e /app/nanobot-websocket-channel/nanobot-channel-protocol
-
-# Install nanobot-webchat
-RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /app/nanobot && uv pip install --no-deps -e /app/nanobot-websocket-channel/nanobot-webchat
+    cd /app/nanobot && uv sync --frozen --no-dev
 
 # ---
 # Stage 2: use a final image without uv
