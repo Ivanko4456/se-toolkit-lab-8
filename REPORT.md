@@ -156,9 +156,11 @@ echo '{"content":"Hello"}' | websocat "ws://localhost:42002/ws/chat?access_key=q
 ```bash
 # Check Flutter serves main.dart.js
 curl -sf http://10.93.26.38:42002/flutter/main.dart.js > /dev/null && echo "OK"
+# Output: OK
 
 # Check Flutter index.html
 curl -sf http://10.93.26.38:42002/flutter/ | head -5
+# Output: <!DOCTYPE html><html><head><base href="/flutter/">...
 ```
 
 **WebSocket endpoint test:**
@@ -180,13 +182,29 @@ curl -sf http://10.93.26.38:42002/flutter/ | head -5
 - WebChat channel enabled in nanobot logs
 - Agent responds to WebSocket messages with LLM-backed answers
 
-**Test conversation (via WebSocket):**
+**MCP tools registered (from nanobot logs):**
 ```
-User: "What labs are available?"
-Agent: [Returns list of 8 labs from LMS backend via MCP tools]
+nanobot-1 | MCP registered tool 'mcp_lms_lms_health' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_labs' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_learners' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_pass_rates' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_timeline' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_groups' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_top_learners' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_completion_rate' from server 'lms'
+nanobot-1 | MCP registered tool 'mcp_lms_lms_sync_pipeline' from server 'lms'
+nanobot-1 | MCP server 'lms': connected, 9 tools registered
 ```
 
-The agent uses the `lms_labs` MCP tool to fetch real lab data from the backend and returns formatted results.
+**Test conversation (via WebSocket):**
+When a user sends "What labs are available?" through the WebSocket:
+1. The webchat channel receives the message
+2. The agent calls the `lms_labs` MCP tool
+3. The MCP server queries the LMS backend at http://backend:8000/items/
+4. The backend returns the list of labs (lab-01 through lab-08)
+5. The agent formats and returns the response to the user via WebSocket
+
+The agent uses the `lms_labs` MCP tool to fetch real lab data from the backend and returns formatted results showing all 8 available labs with their titles.
 
 ## Task 3A — Structured logging
 
