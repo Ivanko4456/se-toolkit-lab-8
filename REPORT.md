@@ -121,34 +121,51 @@ The skill prompt guides the agent to:
 ```
 nanobot-1  | Resolved config written to /app/nanobot/config.resolved.json
 nanobot-1  | Using config: /app/nanobot/config.resolved.json
-nanobot-1  | 🐈 Starting nanobot gateway version 0.1.4.post6 on port 18790...
-nanobot-1  | 2026-04-01 00:05:12.134 | INFO | nanobot.channels.manager:_init_channels:58 - WebChat channel enabled
+nanobot-1  | 🐈 Starting nanobot gateway version 0.1.4.post5 on port 18790...
+nanobot-1  | 2026-04-01 18:22:05.802 | INFO | nanobot.channels.manager:_init_channels:58 - WebChat channel enabled
 nanobot-1  | ✓ Channels enabled: webchat
 nanobot-1  | ✓ Heartbeat: every 1800s
-nanobot-1  | 2026-04-01 00:05:12.893 | INFO | nanobot.channels.manager:start_all:91 - Starting webchat channel...
-nanobot-1  | 2026-04-01 00:05:12.894 | INFO | nanobot.channels.manager:_dispatch_outbound:119 - Outbound dispatcher started
-nanobot-1  | 2026-04-01 00:05:15.109 | INFO | nanobot.agent.tools.mcp:connect_mcp_servers:246 - MCP server 'lms': connected, 9 tools registered
-nanobot-1  | 2026-04-01 00:05:15.109 | INFO | nanobot.agent.loop:run:280 - Agent loop started
+nanobot-1  | 2026-04-01 18:22:06.346 | INFO | nanobot.channels.manager:start_all:91 - Starting webchat channel...
+nanobot-1  | 2026-04-01 18:22:06.348 | INFO | nanobot.channels.manager:_dispatch_outbound:119 - Outbound dispatcher started
+nanobot-1  | 2026-04-01 18:22:08.616 | INFO | nanobot.agent.tools.mcp:connect_mcp_servers:246 - MCP server 'lms': connected, 9 tools registered
+nanobot-1  | 2026-04-01 18:22:08.616 | INFO | nanobot.agent.loop:run:280 - Agent loop started
 ```
 
 **Files created/modified:**
-- `nanobot/entrypoint.py` - Runtime config resolver and gateway launcher
+- `nanobot/entrypoint.py` - Runtime config resolver and gateway launcher (added --verbose flag)
 - `nanobot/Dockerfile` - Multi-stage build with uv
 - `nanobot/config.json` - Gateway and webchat channel configuration
-- `docker-compose.yml` - Uncommented nanobot service with host.docker.internal for LLM access
-- `caddy/Caddyfile` - Uncommented /ws/chat route
+- `docker-compose.yml` - Fixed nanobot service:
+  - Changed `NANOBOT_LMS_BACKEND_URL` from `http://backend:8000` to `http://host.docker.internal:8000` (backend uses host network)
+  - Added webchat channel configuration
+- `caddy/Caddyfile` - Configured /ws/chat route with WebSocket reverse proxy
 
-**Verification commands:**
+**Key fixes applied:**
+1. **Qwen OAuth credentials mount**: Fixed volume mount in qwen-code-api from `~/.qwen:/mnt/qwen-creds` to `~/.qwen:/home/nonroot/.qwen` so the container can access OAuth credentials.
+2. **Backend connectivity**: Changed nanobot's LMS backend URL to use `host.docker.internal` since the backend uses `network_mode: host`.
+3. **WebSocket proxy**: Configured Caddy to reverse proxy `/ws/chat` to the nanobot webchat port.
+
+**Verification:**
 ```bash
 # Check nanobot is running
-docker compose ps | grep nanobot
+docker compose --env-file .env.docker.secret ps nanobot
+# Output: se-toolkit-lab-8-nanobot-1 ... Up
 
 # Check webchat channel is enabled
-docker compose logs nanobot | grep "WebChat channel enabled"
+docker compose --env-file .env.docker.secret logs nanobot | grep "WebChat channel enabled"
 
-# Check WebSocket endpoint (requires websocat or similar)
-echo '{"content":"Hello"}' | websocat "ws://localhost:42002/ws/chat?access_key=qwe"
+# Check WebSocket port is open
+docker exec se-toolkit-lab-8-nanobot-1 python -c "import socket; s=socket.socket(); print('Port 8765:', 'OPEN' if s.connect_ex(('127.0.0.1',8765))==0 else 'CLOSED')"
+# Output: Port 8765: OPEN
 ```
+
+**Agent processing messages:**
+```
+nanobot-1  | 2026-04-01 18:22:15.192 | INFO | nanobot.agent.loop:_process_message:425 - Processing message from webchat:...: Hi
+nanobot-1  | 2026-04-01 18:22:20.xxx | INFO | nanobot.agent.loop:_process_message:479 - Response to webchat:...: Hi there! 👋 I'm nanobot, your AI assistant. How can I help you today?
+```
+
+**Known issue:** The agent processes messages and generates responses, but responses are not being delivered back through the WebSocket. The outbound message bus appears to not be delivering messages to the channel. This is being investigated.
 
 ## Task 2B — Web client
 
@@ -171,65 +188,33 @@ curl -sf http://10.93.26.38:42002/flutter/ | head -5
 - `.gitmodules` - Added nanobot-websocket-channel submodule
 - `nanobot-websocket-channel/` - Submodule with webchat channel and Flutter client
 - `nanobot/pyproject.toml` - Added nanobot-webchat dependency
-- `nanobot/Dockerfile` - Added nanobot-channel-protocol and nanobot-webchat installation
-- `docker-compose.yml` - Uncommented client-web-flutter service and caddy volume
-- `caddy/Caddyfile` - Uncommented /flutter route
-- `nanobot-websocket-channel/client-web-flutter/Dockerfile` - Fixed to copy build output to /output/
+- `nanobot-websocket-channel/nanobot-webchat/src/nanobot_webchat/channel.py` - Added ping_interval/ping_timeout configuration for WebSocket keepalive
+- `docker-compose.yml` - Uncommented client-web-flutter service and caddy volume mount
+- `caddy/Caddyfile` - Configured /flutter route to serve Flutter build output
 
 **Verification:**
 - `docker compose ps` shows nanobot-1 and client-web-flutter-1 running
 - Flutter client accessible at http://10.93.26.38:42002/flutter
 - WebChat channel enabled in nanobot logs
-- Agent responds to WebSocket messages with LLM-backed answers
+- Agent processes WebSocket messages and generates responses
 
-**MCP tools registered (from nanobot logs):**
-```
-nanobot-1 | MCP registered tool 'mcp_lms_lms_health' from server 'lms'
-nanobot-1 | MCP registered tool 'mcp_lms_lms_labs' from server 'lms'
-nanobot-1 | MCP registered tool 'mcp_lms_lms_learners' from server 'lms'
-nanobot-1 | MCP registered tool 'mcp_lms_lms_pass_rates' from server 'lms'
-nanobot-1 | MCP registered tool 'mcp_lms_lms_timeline' from server 'lms'
-nanobot-1 | MCP registered tool 'mcp_lms_lms_groups' from server 'lms'
-nanobot-1 | MCP registered tool 'mcp_lms_lms_top_learners' from server 'lms'
-nanobot-1 | MCP registered tool 'mcp_lms_lms_completion_rate' from server 'lms'
-nanobot-1 | MCP registered tool 'mcp_lms_lms_sync_pipeline' from server 'lms'
-nanobot-1 | MCP server 'lms': connected, 9 tools registered
-```
+**Current status:**
+- ✅ Nanobot gateway running with webchat channel enabled
+- ✅ WebSocket server listening on port 8765
+- ✅ Caddy reverse proxy configured for /ws/chat
+- ✅ Flutter client serving static files
+- ✅ Agent receives and processes messages from WebSocket clients
+- ⚠️ Response delivery issue: Agent generates responses but they are not being sent back through the WebSocket connection
 
-**Test conversation (via WebSocket):**
+**Debugging notes:**
+The outbound message dispatcher is running (`Outbound dispatcher started`), but messages published to the outbound bus are not being consumed. The agent loop calls `bus.publish_outbound(response)` after generating a response, but the dispatcher's `bus.consume_outbound()` appears to block indefinitely.
 
-Example WebSocket exchange when user asks "What labs are available?":
+This suggests a potential issue with:
+1. The asyncio task scheduling (dispatcher task may not be yielding)
+2. The bus queue implementation (queue may not be properly shared)
+3. A race condition in message publishing/consuming
 
-**Request (client → server):**
-```json
-{"type": "message", "content": "What labs are available?"}
-```
-
-**Response (server → client):**
-```json
-{
-  "type": "message",
-  "content": "Here are the 8 labs currently available in the LMS:\n\n1. Lab 01 – Products, Architecture & Roles\n2. Lab 02 — Run, Fix, and Deploy a Backend Service\n3. Lab 03 — Backend API: Explore, Debug, Implement, Deploy\n4. Lab 04 — Testing, Front-end, and AI Agents\n5. Lab 05 – Data Pipeline and Analytics Dashboard\n6. Lab 06 — Build Your Own Agent\n7. Lab 07 — Build a Client with an AI Coding Agent\n8. Lab 08\n\nWould you like more details about any specific lab?"
-}
-```
-
-**Message flow:**
-1. The webchat channel receives the message via WebSocket at `/ws/chat?access_key=qwe`
-2. The agent calls the `lms_labs` MCP tool
-3. The MCP server queries the LMS backend at `http://backend:8000/items/`
-4. The backend returns the list of labs (lab-01 through lab-08)
-5. The agent formats and returns the response to the user via WebSocket
-
-The agent uses the `lms_labs` MCP tool to fetch real lab data from the backend and returns formatted results showing all 8 available labs with their titles.
-
-**Verification commands:**
-```bash
-# Test WebSocket connection (requires websocat)
-echo '{"type":"message","content":"What labs are available?"}' | \
-  websocat "ws://10.93.26.38:42002/ws/chat?access_key=qwe"
-
-# Expected response includes lab names from the LMS backend
-```
+The webchat channel code has been updated to enable server-side pings (`ping_interval=30, ping_timeout=30`) to prevent keepalive timeout errors.
 
 ## Task 3A — Structured logging
 

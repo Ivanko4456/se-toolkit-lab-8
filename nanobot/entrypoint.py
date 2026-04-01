@@ -56,6 +56,7 @@ def main():
     os.execvp("nanobot", [
         "nanobot",
         "gateway",
+        "--verbose",
         "--config",
         resolved_config,
         "--workspace",
